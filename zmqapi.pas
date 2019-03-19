@@ -1703,7 +1703,7 @@ begin
   if filter = '' then
     setSockOpt( ZMQ_SUBSCRIBE, nil, 0 )
   else
-    setSockOpt( ZMQ_SUBSCRIBE, @filter[1], Length( filter ) );
+    setSockOpt( ZMQ_SUBSCRIBE, @filter[Low(filter)], Length( filter ) );
 end;
 
 procedure TZMQSocket.unSubscribe( filter: Utf8String );
@@ -1711,7 +1711,7 @@ begin
   if filter = '' then
     setSockOpt( ZMQ_UNSUBSCRIBE, nil, 0 )
   else
-    setSockOpt( ZMQ_UNSUBSCRIBE, @filter[1], Length( filter ) );
+    setSockOpt( ZMQ_UNSUBSCRIBE, @filter[Low(filter)], Length( filter ) );
 end;
 
 {$ifdef zmq3}
