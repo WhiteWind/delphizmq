@@ -23,6 +23,9 @@ unit zmqapi;
 {$else}
   {$WARN IMPLICIT_STRING_CAST OFF}
   {$WARN IMPLICIT_STRING_CAST_LOSS OFF}
+  {$ifdef POSIX}
+    {$define UNIX}
+  {$endif}
 {$endif}
 
 {$I zmq.inc}
@@ -31,11 +34,16 @@ interface
 
 uses
    {$ifdef UNIX}
-   BaseUnix,
+    {$ifdef FPC}
+     BaseUnix,
+    {$else}
+    Posix.Errno, Posix.Signal,
+    {$endif}
    {$else}
    Windows,
    {$endif}
-   Classes
+    SyncObjs
+  , Classes
   , SysUtils
   , zmq
   ;
@@ -44,7 +52,11 @@ uses
 const
   ZMQEAGAIN = 11;
   {$ifdef UNIX}
-  ZMQEINTR = ESysEINTR;
+    {$ifdef FPC}
+    ZMQEINTR = ESysEINTR;
+    {$else}
+    ZMQEINTR = EINTR;
+    {$endif}
   {$endif}
 
 type
@@ -79,6 +91,10 @@ const
   ];
 type
   {$endif}
+  {$ifdef FPC}
+  PUTF8Char = PAnsiChar;
+  Utf8Char = AnsiChar;
+  {$endif}
 
   UInt64 = Int64;
 
@@ -109,8 +125,8 @@ type
     fMessage: zmq_msg_t;
     function getAsInteger: Integer;
     procedure setAsInteger(const Value: Integer);
-    function getAsHexString: AnsiString;
-    procedure setAsHexString(const Value: AnsiString);
+    function getAsHexString: Utf8String;
+    procedure setAsHexString(const Value: Utf8String);
     procedure CheckResult( rc: Integer );
     {$ifdef zmq3}
     function getProperty( prop: TZMQMessageProperty ): Integer;
@@ -141,14 +157,14 @@ type
 
     function dup: TZMQFrame;
     // convert the data into a readable string.
-    function dump: Utf8String;
+    function dump: String;
 
     // copy the whole content of the stream to the message.
     procedure LoadFromStream( strm: TStream );
     procedure SaveToStream( strm: TStream );
 
     property asUtf8String: Utf8String read getAsUtf8String write setAsUtf8String;
-    property asHexString: AnsiString read getAsHexString write setAsHexString;
+    property asHexString: Utf8String read getAsHexString write setAsHexString;
     property asInteger: Integer read getAsInteger write setAsInteger;
     property asByte: Byte read getAsByte write setAsByte;
     property asBytes: TBytes read getAsBytes write setAsBytes;
@@ -243,7 +259,7 @@ type
 
   TZMQEvent = record
     event: TZMQMonitorEvent;
-    addr: AnsiString;
+    addr: Utf8String;
     case TZMQMonitorEvent of
       meConnected,
       meListening,
@@ -272,7 +288,7 @@ type
   TZMQMonitorRec = record
     terminated: Boolean;
     context: TZMQContext;
-    addr: AnsiString;
+    addr: Utf8String;
     proc: TZMQMonitorProc;
   end;
 
@@ -297,11 +313,11 @@ type
     function send( var msg: TZMQFrame; flags: Integer = 0 ): Integer; overload;
     function recv( var msg: TZMQFrame; flags: Integer = 0 ): Integer; overload;
   public
-    procedure bind( addr: AnsiString );
-    procedure connect( addr: AnsiString );
+    procedure bind( addr: Utf8String );
+    procedure connect( addr: Utf8String );
     {$ifdef zmq3}
-    procedure unbind( addr: AnsiString );
-    procedure disconnect( addr: AnsiString );
+    procedure unbind( addr: Utf8String );
+    procedure disconnect( addr: Utf8String );
     {$endif}
 
   // helpers
@@ -320,7 +336,7 @@ type
     function getRcvTimeout: Integer;
     function getSndTimeout: Integer;
     function getAffinity: UInt64;
-    function getIdentity: ShortString;
+    function getIdentity: Utf8String;
     function getRate: {$ifdef zmq3}Integer{$else}int64{$endif};
     function getRecoveryIvl: {$ifdef zmq3}Integer{$else}int64{$endif};
     function getSndBuf: {$ifdef zmq3}Integer{$else}UInt64{$endif};
@@ -344,7 +360,7 @@ type
     procedure setMulticastHops( const Value: Integer );
     function getIPv4Only: Boolean;
     procedure setIPv4Only( const Value: Boolean );
-    function getLastEndpoint: AnsiString;
+    function getLastEndpoint: Utf8String;
     function getKeepAlive: TZMQKeepAlive;
     procedure setKeepAlive( const Value: TZMQKeepAlive );
     function getKeepAliveIdle: Integer;
@@ -353,8 +369,8 @@ type
     procedure setKeepAliveCnt( const Value: Integer );
     function getKeepAliveIntvl: Integer;
     procedure setKeepAliveIntvl( const Value: Integer );
-    function getAcceptFilter( indx: Integer ): AnsiString;
-    procedure setAcceptFilter( indx: Integer; const Value: AnsiString );
+    function getAcceptFilter( indx: Integer ): Utf8String;
+    procedure setAcceptFilter( indx: Integer; const Value: Utf8String );
     procedure setRouterMandatory( const Value: Boolean );
     {$else}
     function getSwap: Int64;
@@ -369,7 +385,7 @@ type
     procedure setRcvTimeout( const Value: Integer );
     procedure setSndTimeout( const Value: Integer );
     procedure setAffinity( const Value: UInt64 );
-    procedure setIdentity( const Value: ShortString );
+    procedure setIdentity( const Value: Utf8String );
     procedure setRate( const Value: {$ifdef zmq3}Integer{$else}int64{$endif} );
     procedure setRecoveryIvl( const Value: {$ifdef zmq3}Integer{$else}int64{$endif} );
     procedure setSndBuf( const Value: {$ifdef zmq3}Integer{$else}UInt64{$endif} );
@@ -379,8 +395,8 @@ type
     procedure setReconnectIvlMax( const Value: Integer );
     procedure setBacklog( const Value: Integer );
 
-    procedure Subscribe( filter: AnsiString );
-    procedure unSubscribe( filter: AnsiString );
+    procedure Subscribe( filter: Utf8String );
+    procedure unSubscribe( filter: Utf8String );
 
     function send( var msg: TZMQFrame; flags: TZMQSendFlags = [] ): Integer; overload;
     function send( strm: TStream; size: Integer; flags: TZMQSendFlags = [] ): Integer; overload;
@@ -418,14 +434,14 @@ type
     property MaxMsgSize: Int64 read getMaxMsgSize write setMaxMsgSize;
     property MulticastHops: Integer read getMulticastHops write setMulticastHops;
     property IPv4Only: Boolean read getIPv4Only write setIPv4Only;
-    property LastEndpoint: AnsiString read getLastEndpoint;
+    property LastEndpoint: Utf8String read getLastEndpoint;
     property KeepAlive: TZMQKeepAlive read getKeepAlive write setKeepAlive;
     property KeepAliveIdle: Integer read getKeepAliveIdle write setKeepAliveIdle;
     property KeepAliveCnt: Integer read getKeepAliveCnt write setKeepAliveCnt;
     property KeepAliveIntvl: Integer read getKeepAliveIntvl write setKeepAliveIntvl;
 
-    procedure AddAcceptFilter( addr: AnsiString );
-    property AcceptFilter[indx: Integer]: AnsiString read getAcceptFilter write setAcceptFilter;
+    procedure AddAcceptFilter( addr: Utf8String );
+    property AcceptFilter[indx: Integer]: Utf8String read getAcceptFilter write setAcceptFilter;
 
     property RouterMandatory: Boolean write setRouterMandatory;
     {$else}
@@ -438,7 +454,7 @@ type
     property RcvTimeout: Integer read getRcvTimeout write setRcvTimeout;
     property SndTimeout: Integer read getSndTimeout write setSndTimeout;
     property Affinity: UInt64 read getAffinity write setAffinity;
-    property Identity: ShortString read getIdentity write setIdentity;
+    property Identity: Utf8String read getIdentity write setIdentity;
     property Rate: {$ifdef zmq3}Integer{$else}int64{$endif} read getRate write setRate;
     property RecoveryIvl: {$ifdef zmq3}Integer{$else}int64{$endif} read getRecoveryIvl write setRecoveryIvl;
     property SndBuf: {$ifdef zmq3}Integer{$else}UInt64{$endif} read getSndBuf write setSndBuf;
@@ -518,7 +534,7 @@ type
     fContext: TZMQContext;
     fOwnContext: Boolean;
     sPair: TZMQSocket;
-    fAddr: AnsiString;
+    fAddr: Utf8String;
 
     fPollItem: array of zmq.pollitem_t;
     fPollSocket: array of TZMQSocket;
@@ -529,7 +545,7 @@ type
 
     fPollNumber: Integer;
 
-    cs: TRTLCriticalSection;
+    cs: TCriticalSection;
     fSync: Boolean;
 
     fonException: TZMQExceptionProc;
@@ -628,7 +644,7 @@ implementation
 
 var
   contexts: TList;
-  cs: TRTLCriticalSection;
+  cs: TCriticalSection;
 
 {$ifndef UNIX}
 function console_handler( dwCtrlType: DWORD ): BOOL; stdcall; forward;
@@ -639,13 +655,13 @@ function console_handler( dwCtrlType: DWORD ): BOOL; stdcall; forward;
 constructor EZMQException.Create;
 begin
   errnum := zmq_errno;
-  inherited Create( String( AnsiString( zmq_strerror( errnum ) ) ) );
+  inherited Create( String( Utf8String( zmq_strerror( errnum ) ) ) );
 end;
 
 constructor EZMQException.Create( lerrn: Integer );
 begin
   errnum := lerrn;
-  inherited Create( String( AnsiString( zmq_strerror( errnum ) ) ) );
+  inherited Create( String( Utf8String( zmq_strerror( errnum ) ) ) );
 end;
 
 { TZMQMessage }
@@ -758,20 +774,17 @@ begin
   System.Move( data^, result.data^, size );
 end;
 
-function TZMQFrame.dump: Utf8String;
+function TZMQFrame.dump: String;
 var
-  sUtf8: Utf8String;
   iSize: Integer;
 begin
   // not complete.
   iSize := size;
   if iSize = 0 then
     result := ''
-  else if AnsiChar(data^) = #0 then
+  else if Utf8Char(data^) = #0 then
   begin
-    SetLength( sutf8, iSize * 2 );
-    BinToHex( data, PAnsiChar(sutf8), iSize );
-    result := sutf8;
+    Result := AsHexString;
   end else
     result := asUtf8String;
 end;
@@ -787,10 +800,27 @@ begin
   System.Move(data^, Result[0], size);
 end;
 
-function TZMQFrame.getAsHexString: AnsiString;
+function TZMQFrame.getAsHexString: Utf8String;
+var
+  {$IFDEF NEXTGEN}
+  sBytes: TBytes;
+  dBytes: TBytes;
+  {$ELSE}
+  sUtf8: Utf8String;
+  {$ENDIF}
+  iSize: Integer;
 begin
-  SetLength( result, size * 2 );
-  BinToHex( data, PAnsiChar(result), size );
+  iSize := size;
+  {$IFDEF NEXTGEN}
+  SetLength(sBytes, iSize);
+  System.Move(data^, sBytes[0], iSize);
+  BinToHex( sBytes, 0, dBytes, 0, iSize );
+  Result := TEncoding.UTF8.GetString(sBytes);
+  {$ELSE}
+  SetLength( sutf8, iSize * 2 );
+  BinToHex( data, PAnsiChar(sutf8), iSize );
+  result := sutf8;
+  {$ENDIF}
 end;
 
 function TZMQFrame.getAsInteger: Integer;
@@ -800,7 +830,7 @@ end;
 
 function TZMQFrame.getAsUtf8String: Utf8String;
 begin
-  SetString( Result, PAnsiChar(data), size );
+  SetString( Result, PUTF8Char(data), size );
 end;
 
 procedure TZMQFrame.setAsByte(const Value: Byte);
@@ -818,13 +848,23 @@ begin
   System.Move(Value[0], data^, Length(Value));
 end;
 
-procedure TZMQFrame.setAsHexString( const Value: AnsiString );
+procedure TZMQFrame.setAsHexString( const Value: Utf8String );
 var
   iSize: Integer;
+  {$IFDEF NEXTGEN}
+  sBytes,
+  dBytes: TBytes;
+  {$ENDIF}
 begin
   iSize := Length( Value ) div 2;
   rebuild( iSize );
-  HexToBin( PAnsiChar( value ), data, iSize );
+  {$IFDEF NEXTGEN}
+  SetLength(sBytes, Length(Value));
+  System.Move(Value[Low(Value)], sBytes, Length(sBytes));
+  HexToBin(sBytes, 0, dBytes, 0, iSize);
+  {$ELSE}
+  HexToBin( PUTF8Char( value ), data, iSize );
+  {$ENDIF}
 end;
 
 procedure TZMQFrame.setAsInteger( const Value: Integer );
@@ -842,7 +882,7 @@ var
 begin
   iSize := Length( Value );
   rebuild( iSize );
-  System.Move( Value[1], data^, iSize );
+  System.Move( Value[Low(Value)], data^, iSize );
 end;
 
 procedure TZMQFrame.LoadFromStream( strm: TStream );
@@ -1058,11 +1098,7 @@ begin
   begin
     iSize := msg.size;
     msgnew := TZMQFrame.create( iSize );
-    {$ifdef UNIX}
     Move( msg.data^, msgnew.data^, iSize );
-    {$else}
-    CopyMemory( msgnew.data, msg.data, iSize );
-    {$endif}
     result.add( msgnew );
     msg := next;
   end;
@@ -1195,25 +1231,25 @@ begin
   CheckResult( zmq_getsockopt( SocketPtr, option, optval, optvallen ) );
 end;
 
-procedure TZMQSocket.bind( addr: AnsiString );
+procedure TZMQSocket.bind( addr: Utf8String );
 begin
-  CheckResult( zmq_bind( SocketPtr, PAnsiChar( addr ) ) );
+  CheckResult( zmq_bind( SocketPtr, PUTF8Char( addr ) ) );
 end;
 
-procedure TZMQSocket.connect( addr: AnsiString );
+procedure TZMQSocket.connect( addr: Utf8String );
 begin
-  CheckResult(  zmq_connect( SocketPtr, PAnsiChar( addr ) ) );
+  CheckResult(  zmq_connect( SocketPtr, PUTF8Char( addr ) ) );
 end;
 
 {$ifdef zmq3}
-procedure TZMQSocket.unbind( addr: AnsiString );
+procedure TZMQSocket.unbind( addr: Utf8String );
 begin
-  CheckResult( zmq_unbind( SocketPtr, PAnsiChar( addr ) ) );
+  CheckResult( zmq_unbind( SocketPtr, PUTF8Char( addr ) ) );
 end;
 
-procedure TZMQSocket.disconnect( addr: AnsiString );
+procedure TZMQSocket.disconnect( addr: Utf8String );
 begin
-  CheckResult( zmq_disconnect( SocketPtr, PAnsiChar( addr ) ) );
+  CheckResult( zmq_disconnect( SocketPtr, PUTF8Char( addr ) ) );
 end;
 {$endif}
 
@@ -1278,15 +1314,14 @@ begin
   result := getSockOptInt64( ZMQ_AFFINITY );
 end;
 
-function TZMQSocket.getIdentity: ShortString;
+function TZMQSocket.getIdentity: Utf8String;
 var
-  s: ShortString;
   optvallen: size_t;
 begin
   optvallen := 255;
-  getSockOpt( ZMQ_IDENTITY, @s[1], optvallen );
-  SetLength( s, optvallen );
-  result := s;
+  SetLength(Result, 255);
+  getSockOpt( ZMQ_IDENTITY, @Result[Low(Result)], optvallen );
+  SetLength( Result, optvallen );
 end;
 
 function TZMQSocket.getRate: {$ifdef zmq3}Integer{$else}int64{$endif};
@@ -1425,13 +1460,14 @@ begin
   setSockOptInteger( ZMQ_IPV4ONLY, Integer(Value) );
 end;
 
-function TZMQSocket.getLastEndpoint: AnsiString;
+function TZMQSocket.getLastEndpoint: Utf8String;
 var
-  s: ShortString;
+  s: Utf8String;
   optvallen: size_t;
 begin
   optvallen := 255;
-  getSockOpt( ZMQ_LAST_ENDPOINT, @s[1], optvallen );
+  SetLength(s, optvallen);
+  getSockOpt( ZMQ_LAST_ENDPOINT, @s[Low(s)], optvallen );
   SetLength( s, optvallen - 1);
   result := s;
 end;
@@ -1476,26 +1512,27 @@ begin
   setSockOptInteger( ZMQ_TCP_KEEPALIVE_INTVL, Value );
 end;
 
-procedure TZMQSocket.AddAcceptFilter( addr: AnsiString );
+procedure TZMQSocket.AddAcceptFilter( addr: Utf8String );
 begin
   try
-    setSockOpt( ZMQ_TCP_ACCEPT_FILTER, @addr[1], Length( addr ) );
+    setSockOpt( ZMQ_TCP_ACCEPT_FILTER, @addr[Low(addr)], Length( addr ) );
     fAcceptFilter.Add( addr );
   except
     raise;
   end;
 end;
 
-function TZMQSocket.getAcceptFilter( indx: Integer ): AnsiString;
+function TZMQSocket.getAcceptFilter( indx: Integer ): Utf8String;
 begin
   if ( indx < 0 ) or ( indx >= fAcceptFilter.Count ) then
     raise EZMQException.Create( '[getAcceptFilter] Index out of bounds.' );
   result := fAcceptFilter[indx];
 end;
 
-procedure TZMQSocket.setAcceptFilter( indx: Integer; const Value: AnsiString );
+procedure TZMQSocket.setAcceptFilter( indx: Integer; const Value: Utf8String );
 var
   i,num: Integer;
+  sUtf8: UTF8String;
 begin
   num := 0;
   if ( indx < 0 ) or ( indx >= fAcceptFilter.Count ) then
@@ -1505,18 +1542,22 @@ begin
   for i := 0 to fAcceptFilter.Count - 1 do
   begin
     try
-      if i <> indx then
-        setSockOpt( ZMQ_TCP_ACCEPT_FILTER, @fAcceptFilter[i][1], Length( fAcceptFilter[i] ) )
-      else begin
-        setSockOpt( ZMQ_TCP_ACCEPT_FILTER, @Value[1], Length( Value ) );
+      if i = indx then
+        sUtf8 := Value
+      else
+        sUtf8 := fAcceptFilter[i];
+      setSockOpt( ZMQ_TCP_ACCEPT_FILTER, @sUtf8[Low(sUtf8)], Length( sUtf8 ) );
+      if i = indx then
         fAcceptFilter[i] := Value;
-      end;
     except
       on e: EZMQException do
       begin
         num := e.Num;
         if i = indx then
-          setSockOpt( ZMQ_TCP_ACCEPT_FILTER, @fAcceptFilter[i][1], Length( fAcceptFilter[i] ) )
+        begin
+          sUtf8 := fAcceptFilter[i];
+          setSockOpt( ZMQ_TCP_ACCEPT_FILTER, @sUtf8[Low(sUtf8)], Length( sUtf8 ) );
+        end
       end else
         raise;
     end;
@@ -1586,9 +1627,9 @@ begin
   setSockOptInt64( ZMQ_AFFINITY, Value );
 end;
 
-procedure TZMQSocket.setIdentity( const Value: ShortString );
+procedure TZMQSocket.setIdentity( const Value: Utf8String );
 begin
-  setSockOpt( ZMQ_IDENTITY, @Value[1], Length( Value ) );
+  setSockOpt( ZMQ_IDENTITY, @Value[Low(Value)], Length( Value ) );
 end;
 
 procedure TZMQSocket.setRcvTimeout( const Value: Integer );
@@ -1657,7 +1698,7 @@ begin
   setSockOptInteger( ZMQ_BACKLOG, Value );
 end;
 
-procedure TZMQSocket.subscribe( filter: AnsiString );
+procedure TZMQSocket.subscribe( filter: Utf8String );
 begin
   if filter = '' then
     setSockOpt( ZMQ_SUBSCRIBE, nil, 0 )
@@ -1665,7 +1706,7 @@ begin
     setSockOpt( ZMQ_SUBSCRIBE, @filter[1], Length( filter ) );
 end;
 
-procedure TZMQSocket.unSubscribe( filter: AnsiString );
+procedure TZMQSocket.unSubscribe( filter: Utf8String );
 begin
   if filter = '' then
     setSockOpt( ZMQ_UNSUBSCRIBE, nil, 0 )
@@ -1869,11 +1910,7 @@ begin
       msgsize := socket.recv( msg, [] );
       if msgsize > -1 then
       begin
-        {$ifdef UNIX}
         Move( msg.data^, event, SizeOf(event) );
-        {$else}
-        CopyMemory( @event, msg.data, SizeOf(event) );
-        {$endif}
         i := 0;
         while event.event <> 0 do
         begin
@@ -1899,14 +1936,14 @@ end;
 
 procedure TZMQSocket.RegisterMonitor( proc: TZMQMonitorProc; events: TZMQMonitorEvents = cZMQMonitorEventsAll );
 var
-  {$ifdef UNIX}
-  tid: QWord;
-  {$else}
-    {$ifdef FPC}
-    tid: SizeUInt;
+  {$ifdef FPC}
+    {$ifdef UNIX}
+    tid: QWord;
     {$else}
-    tid: Cardinal;
+    tid: SizeUInt;
     {$endif}
+  {$else}
+  tid: TThreadID;
   {$endif}
 begin
   if fMonitorRec <> nil then
@@ -1919,9 +1956,13 @@ begin
   fMonitorRec.Proc := proc;
 
   CheckResult( zmq_socket_monitor( SocketPtr,
-    PAnsiChar( AnsiString( fMonitorRec.Addr ) ), Word( events ) ) );
+    PUTF8Char( Utf8String( fMonitorRec.Addr ) ), Word( events ) ) );
 
+  {$IFDEF POSIX}
+  fMonitorThread := BeginThread( nil, @MonitorProc, fMonitorRec, tid );
+  {$ELSE}
   fMonitorThread := BeginThread( nil, 0, @MonitorProc, fMonitorRec, 0, tid );
+  {$ENDIF}
   sleep(1);
 
 end;
@@ -1931,6 +1972,10 @@ var
   rc: Cardinal;
 begin
   {$ifdef UNIX}
+    raise Exception.Create(Self.ClassName+'.DeRegisterMonitor not implemented');
+    { TODO : implement equivalent to WaitForSingleObject like pthread_join() ? }
+  {$else}
+  {$ifdef POSIX}
     raise Exception.Create(Self.ClassName+'.DeRegisterMonitor not implemented');
     { TODO : implement equivalent to WaitForSingleObject like pthread_join() ? }
   {$else}
@@ -1944,6 +1989,7 @@ begin
     Dispose( fMonitorRec );
     fMonitorRec := nil;
   end;
+  {$endif}
   {$endif}
 end;
 
@@ -2205,7 +2251,7 @@ end;
 
 function TZMQContext.Socket( stype: TZMQSocketType ): TZMQSocket;
 begin
-  EnterCriticalSection( cs );
+  cs.Acquire;
   try
     result := TZMQSocket.Create;
     result.fSocket := zmq_socket( ContextPtr, Byte( stype ) );
@@ -2218,7 +2264,7 @@ begin
     result.fContext := self;
     fSockets.Add( result );
   finally
-    LeaveCriticalSection( cs );
+    cs.Release;
   end;
 end;
 
@@ -2226,14 +2272,14 @@ procedure TZMQContext.RemoveSocket( lSocket: TZMQSocket );
 var
   i: Integer;
 begin
-  EnterCriticalSection( cs );
+  cs.Acquire;
   try
     i := fSockets.IndexOf( lSocket );
     if i < 0 then
       raise EZMQException.Create( 'Socket not in context' );
     fSockets.Delete( i );
   finally
-    LeaveCriticalSection( cs );
+    cs.Release;
   end;
 end;
 
@@ -2253,11 +2299,7 @@ const
 constructor TZMQPoller.Create( lSync: Boolean = false; lContext: TZMQContext = nil );
 begin
   fSync := lSync;
-  {$ifdef UNIX}
-  InitCriticalSection( cs );
-  {$else}
-  InitializeCriticalSection( cs );
-  {$endif}
+  cs.Acquire;
 
   fonException := nil;
 
@@ -2295,12 +2337,7 @@ begin
       fContext.Free;
   end;
 
-
-  {$ifdef UNIX}
-  DoneCriticalSection( cs );
-  {$else}
-  DeleteCriticalSection( cs );
-  {$endif}
+  cs.Free;
   inherited;
 end;
 
@@ -2314,7 +2351,7 @@ end;
 
 procedure TZMQPoller.AddToPollItems( socket: TZMQSocket; events: TZMQPollEvents );
 begin
-  EnterCriticalSection( cs );
+  cs.Acquire;
   try
     if fPollItemCapacity = fPollItemCount then
     begin
@@ -2330,7 +2367,7 @@ begin
     fPollItemCount := fPollItemCount + 1;
     fPollNumber := fPollItemCount;
   finally
-    LeaveCriticalSection( cs );
+    cs.Release;
   end;
 end;
 
@@ -2338,7 +2375,7 @@ procedure TZMQPoller.DelFromPollItems( socket: TZMQSocket; events: TZMQPollEvent
 var
   i: Integer;
 begin
-  EnterCriticalSection( cs );
+  cs.Acquire;
   try
     fPollItem[indx].events := fPollItem[indx].events and not Byte( events );
     if fPollItem[indx].events = 0 then
@@ -2351,20 +2388,20 @@ begin
       Dec( fPollItemCount );
     end;
   finally
-    LeaveCriticalSection( cs );
+    cs.Release;
   end;
 end;
 
 function TZMQPoller.getPollItem( indx: Integer ): TZMQPollItem;
 begin
-  EnterCriticalSection( cs );
+  cs.Acquire;
   try
     result.socket := fPollSocket[indx];
     Byte(result.events) := fPollItem[indx].events;
     Byte(result.revents) := fPollItem[indx].revents;
 
   finally
-    LeaveCriticalSection( cs );
+    cs.Release;
   end;
 end;
 
@@ -2584,7 +2621,7 @@ end;
 
 /// if the second parameter specified, than only the first "pollCount"
 /// sockets polled
-function TZMQPoller.poll( timeout: Integer = -1; lPollNumber: Integer = -1 ): Integer;
+function TZMQPoller.poll( timeout: Longint = -1; lPollNumber: Integer = -1 ): Integer;
 var
   pc, i: Integer;
   errno: Integer;
@@ -2732,27 +2769,27 @@ begin
     TZMQContext(contexts[i]).Terminate;
 end;
 
-procedure HandleSignal(signum: longint; si: psiginfo; sc: PSigcontext); cdecl;
+procedure HandleSignal(signum: longint; si: Pointer; sc: Pointer); cdecl;
 begin
   InterruptContexts;
   Writeln('zmqapi handling signal: ' + IntToStr(signum));
 end;
 
-procedure InstallSigHandler(sig: cint); cdecl;
+procedure InstallSigHandler(sig: Integer); cdecl;
 var
   k : integer;
-  oa, na : PSigActionRec;
+  oa, na : {$ifdef FPC}PSigActionRec{$else}Psigaction_t{$endif};
 begin
   new(na);
   new(oa);
-  na^.sa_handler := @HandleSignal;
+  na^{$ifdef DCC}._u{$endif}.sa_handler := @HandleSignal;
   fillchar(na^.sa_mask,sizeof(na^.sa_mask),#0);
   na^.sa_flags := 0;
   na^.sa_restorer := nil;
-  k := fpSigaction(sig,na,oa);
+  k := {$ifdef FPC}fpSigaction{$else}Sigaction{$endif}(sig,na,oa);
   if k<>0 then
     begin
-      Writeln('signal handler install error '+IntToStr(k)+' '+IntToStr(fpgeterrno));
+      Writeln('signal handler install error '+IntToStr(k)+' '+IntToStr({$ifdef FPC}fpgeterrno{$else}errno{$endif}));
       halt(1);
     end;
   Freemem(oa);
@@ -2765,7 +2802,7 @@ end;
    function is executed in a separate thread, because Terminate terminates the
    context, which blocks until there are open sockets.
 }
-function console_handler( dwCtrlType: DWORD ): BOOL;
+function console_handler( dwCtrlType: Cardinal ): LongBool;
 var
   i: Integer;
 begin
@@ -2786,7 +2823,7 @@ end;
 
 procedure ZMQTerminate;
 begin
-  {$ifndef UNIX}  
+  {$ifdef WINDOWS}
   GenerateConsoleCtrlEvent( CTRL_C_EVENT, 0 );
   {$endif}
 end;
@@ -2866,11 +2903,7 @@ begin
 end;
 
 initialization
-  {$ifdef UNIX}
-  InitCriticalSection( cs );
-  {$else}
-  InitializeCriticalSection( cs );
-  {$endif}
+  cs := TCriticalSection.Create;
   contexts := TList.Create;
   {$ifdef UNIX}
   { TODO : Signal handling should normally be installed at application level, not in library }
@@ -2882,10 +2915,5 @@ initialization
 
 finalization
   contexts.Free;
-  {$ifdef UNIX}
-  DoneCriticalSection( cs );
-  {$else}
-  DeleteCriticalSection( cs );
-  {$endif}
-
+  cs.Free();
 end.

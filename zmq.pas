@@ -1,4 +1,4 @@
-{
+﻿{
     Copyright (c) 2012 Varga Balázs (bb.varga@gmail.com)
 
     This file is part of 0MQ Delphi binding
@@ -18,8 +18,14 @@
 }
 unit zmq;
 
+
+{$ifdef POSIX}
+  {$define UNIX}
+{$endif}
 {$ifdef UNIX}
+  {$ifdef FPC}
   {$linklib pthread}
+  {$endif}
 {$endif}
 
 {$IFDEF ZMQ_STATIC_LINK}
@@ -47,6 +53,11 @@ const
   libzmq = 'libzmq.dll';
   {$endif}
 {$ENDIF}
+
+{$ifdef FPC}
+type
+  PUTF8Char = PAnsiChar;
+{$endif}
 
 {  Run-time API version detection                                              }
 procedure zmq_version( var major, minor, patch: Integer ); cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
@@ -93,7 +104,7 @@ const
 function zmq_errno: Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 
 {*  Resolves system errors and 0MQ errors to human-readable string.           *}
-function zmq_strerror(errnum: Integer):PAnsiChar; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
+function zmq_strerror(errnum: Integer):PUTF8Char; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 
 {******************************************************************************}
 {*  0MQ infrastructure (a.k.a. context) initialisation & termination.         *}
@@ -313,7 +324,7 @@ const
 type
   zmq_event_t = record
     event: Integer;
-    addr: PAnsiChar;
+    addr: PUTF8Char;
     case Integer of
       0, // connected
       3, // listening
@@ -341,11 +352,11 @@ function zmq_socket(context: Pointer; stype: Integer): Pointer; cdecl; external 
 function zmq_close(s: Pointer): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 function zmq_setsockopt(s: Pointer; option: Integer; optval: Pointer; optvallen: size_t ): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 function zmq_getsockopt(s: Pointer; option: Integer; optval: Pointer; var optvallen: size_t): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
-function zmq_bind(s: Pointer; addr: PAnsiChar): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
-function zmq_connect(s: Pointer; addr: PAnsiChar): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
+function zmq_bind(s: Pointer; addr: PUTF8Char): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
+function zmq_connect(s: Pointer; addr: PUTF8Char): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 {$ifdef zmq3}
-function zmq_unbind(s: Pointer; addr: PAnsiChar): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
-function zmq_disconnect(s: Pointer; addr: PAnsiChar): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
+function zmq_unbind(s: Pointer; addr: PUTF8Char): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
+function zmq_disconnect(s: Pointer; addr: PUTF8Char): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 {$endif}
 
 {$ifdef zmq3}
@@ -360,7 +371,7 @@ function zmq_recv (s: Pointer; var msg: zmq_msg_t; flags: Integer): Integer; cde
 function zmq_sendmsg(s: Pointer; var msg: zmq_msg_t; flags: Integer): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 function zmq_recvmsg(s: Pointer; var msg: zmq_msg_t; flags: Integer): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 
-function zmq_socket_monitor( s: Pointer; addr: PAnsiChar; events: Integer ): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
+function zmq_socket_monitor( s: Pointer; addr: PUTF8Char; events: Integer ): Integer; cdecl; external {$IFNDEF ZMQ_STATIC_LINK}libzmq{$ENDIF};
 
 {
 /*  Experimental                                                              */
