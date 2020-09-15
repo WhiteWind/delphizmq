@@ -1797,16 +1797,17 @@ var
   flags: TZMQSendFlags;
   frame: TZMQFrame;
   rc: Integer;
+  i: Integer;
 begin
   Result := 0;
   if dontwait then
     flags := [{$ifdef zmq3}sfDontWait{$else}sfNoBlock{$endif}]
   else
     flags := [];
-  while msgs.size > 0 do
+  for i := 0 to msgs.size - 1 do
   begin
-    frame := msgs.pop;
-    if msgs.size = 0 then
+    frame := msgs[i];
+    if i = msgs.size - 1 then
       rc := send( frame, flags )
     else
       rc := send( frame, flags + [sfSndMore] );
